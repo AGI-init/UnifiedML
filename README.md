@@ -44,7 +44,7 @@ This library is built by a single individual from low-income means on almost no 
 
 ### Push-requests
 
-This library is a work of passion and dedication. The standards for accepted push requests are high, but if you have a push that you would like to make or a contribution that you would like to propose, you may [make a request]() and/or leave a note to me either in [issues](https://github.com/AGI-init/UnifiedML/issues) or by email at [agi.init@gmail.com](mailto:agi.init@gmail.com?subject=Contributing).
+This library is a work of passion and dedication. The standards for accepted push requests are high, but if you have a push that you would like to make or a contribution that you would like to propose, you may [make a request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/about-collaborative-development-models) and/or leave a note to me either in [issues](https://github.com/AGI-init/UnifiedML/issues) or by email at [agi.init@gmail.com](mailto:agi.init@gmail.com?subject=Contributing).
 
 Thank you.
 
