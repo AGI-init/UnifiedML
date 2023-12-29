@@ -1,0 +1,11 @@
+imports:
+  - supervised
+suite_name: regression
+
+dataset:
+  classify: false
+
+metric:
+  mse: World.Metrics.MSE
+
+discrete: false

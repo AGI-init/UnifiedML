@@ -1,0 +1,9 @@
+imports:
+  - atari
+
+env: World.Environments.SuperMario.SuperMario
+task_name: Mario
+nstep: 3
+frame_stack: 4
+train_steps: 1000000
+stddev_schedule: 'linear(1.0,0.1,800000)'

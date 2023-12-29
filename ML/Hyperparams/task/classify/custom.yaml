@@ -1,0 +1,32 @@
+Env: World.Environments.Datums.Datums
+Dataset: null
+metric: 
+    accuracy: World.Metrics.Accuracy
+env:
+    dataset: ${dataset}
+    test_dataset: ${test_dataset}
+    low: null
+    high: null
+    batch_size: ${batch_size}
+    num_workers: ${num_workers}
+dataset:
+    Transform: null
+logger:
+    log_actions: ${not:${generate}}
+suite_name: classify
+task_name: ${format:${Dataset}}
+discrete: true
+train_steps: 200000
+stddev_schedule: 'linear(1.0,0.1,100000)'
+frame_stack: null
+action_repeat: null
+nstep: 0
+evaluate_per_steps: 1000
+evaluate_episodes: 1
+learn_per_steps: 1
+learn_steps_after: 0
+seed_steps: 0
+rand_steps: 0
+log_per_episodes: 300
+RL: false
+online: false  # Same as offline: true

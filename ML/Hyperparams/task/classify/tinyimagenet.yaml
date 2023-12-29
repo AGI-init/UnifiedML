@@ -1,0 +1,8 @@
+imports:
+    - classify
+Dataset: World.Datasets.TinyImageNet.TinyImageNet
+env:
+    low: 0
+    high: 1
+dataset:
+    Transform: null

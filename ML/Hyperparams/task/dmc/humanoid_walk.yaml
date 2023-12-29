@@ -1,0 +1,8 @@
+imports:
+    - dmc
+nstep: 3
+train_steps: 15000000
+stddev_schedule: 'linear(1.0,0.1,2000000)'
+lr: 8e-5
+trunk_dim: 100
+

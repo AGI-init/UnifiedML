@@ -1,0 +1,347 @@
+# Default task
+task: classify/mnist
+
+# Agent
+Agent: Agents.Agent
+Model: ${Agent}
+obs_spec: {}
+action_spec:
+  discrete: ???
+num_actions: 1
+standardize: true
+norm: 0.5  # Note: ignored / mutually exclusive if standardize
+z_dim: 50  # Shorthand for trunk_dim (Generator noise input dim)
+trunk_dim: ${z_dim}
+hidden_dim: 1024
+rand_steps: 2000
+lr: 1e-4
+lr_decay_epochs: null
+weight_decay: 0
+ema_decay: 0.99
+stddev_schedule: ${stddev_schedule}
+num_critics: 2
+num_actors: 1
+# Domains
+online: true  # Shorthand for not offline
+offline: ${not:${online}}  # Defaults to true for classify tasks
+stream: false
+discrete: ${action_spec.discrete}
+RL: true  # Defaults to false for classify tasks
+supervise: true
+generate: false
+multi_task: null
+# Environment
+Env: ???  # To be specified later, defaults per respective task
+env:
+  _target_: ${Env}
+  transform: null
+  standardize: ${standardize}
+  norm: ${norm}
+  metric: ${metric}
+Dataset: null  # Defaults per respective Classify task
+TestDataset: null
+dataset:
+  _target_: ${Dataset}
+  classify: true
+  subset: null
+  Aug: null
+  Transform: null
+  transform:
+    _target_: ${dataset.Transform}
+    device: ${device}
+  aug:
+    _target_: ${dataset.Aug}
+    device: ${device}
+test_dataset:
+  _default_: ${dataset}
+  _if_not_null_:
+    _target_: ${TestDataset}  # Note test_dataset.Transform not supported
+frame_stack: 3
+truncate_episode_steps: 1000
+action_repeat: 1
+# Replay
+capacity: 1e6  # Shorthand for replay.ram_capacity
+ram_capacity: ${capacity}
+tensor_ram_capacity: 0
+hd_capacity: inf
+nstep: 10
+batch_size: 256
+discount: 0.99
+transform: null
+# Training
+seed_steps: 2000
+learn_per_steps: 2
+learn_steps: 1
+learn_steps_after: 20000
+# Evaluating
+evaluate_per_steps: 5000
+evaluate_episodes: 1
+reward: null
+metric:
+  reward: ${reward}
+ema: false
+# Saving
+save: true
+save_per_steps: 0
+save_path: ./Checkpoints/${experiment}/${format:${agent._target_}}/${suite_name}/${task_name}_${seed}.pt
+load_path: ${save_path}
+load: false
+load_per_steps: 0
+# Logging
+vlog: ${generate}  # Shorthand for render
+render: ${vlog}  # Shorthand for log_media
+log_media: ${render}
+log_per_episodes: 1
+# Plotting
+plot_per_steps: 50000
+# Misc
+path: null
+log_path: ./
+device: ???
+parallel: false
+num_workers: 8
+autocast: false  # Shorthand for mixed_precision
+mixed_precision: ${autocast}
+# Experiment
+#agent_name: ${format:${agent._target_}}  TODO
+suite_name: ${format:${env._target_}}
+task_name: ${format:${task}}
+seed: 1
+experiment: Exp
+
+environment:
+  _target_: World.Environment.Environment
+  env: ${env}
+  frame_stack: ${frame_stack}
+  truncate_episode_steps: ${truncate_episode_steps}
+  action_repeat: ${action_repeat}
+  RL: ${RL}
+  offline: ${offline}
+  stream: ${stream}
+  generate: ${generate}
+  ema: ${ema}
+  seed: ${seed}
+  transform: ${env.transform}
+  device: ${device}
+  obs_spec: ${obs_spec}
+  action_spec: ${action_spec}
+
+model:
+  _target_: ${Model}
+
+agent:
+  _target_: ${model._target_}
+  obs_spec: ${obs_spec}
+  action_spec: ${action_spec}
+  num_actions: ${num_actions}
+  trunk_dim: ${trunk_dim}
+  hidden_dim: ${hidden_dim}
+  standardize: ${standardize}
+  norm: ${norm}
+  recipes: ${recipes}
+  lr: ${lr}
+  lr_decay_epochs: ${lr_decay_epochs}
+  weight_decay: ${weight_decay}
+  ema_decay: ${ema_decay}
+  ema: ${ema}
+  rand_steps: ${rand_steps}
+  stddev_schedule: ${stddev_schedule}
+  discrete: ${discrete}
+  RL: ${RL}
+  supervise: ${supervise}
+  generate: ${generate}
+  device: ${device}
+  parallel: ${parallel}
+  log: ${offline}
+  num_critics: ${num_critics}
+  num_actors: ${num_actors}
+  # These won't be passed to backbone-agent
+  _default_:
+    depth: 0
+
+replay:
+  _target_: World.Replay.Replay
+  path: ${experiment}/${format:${agent._target_}}/${suite_name}/${task_name}_${seed}_Memories/
+  batch_size: ${batch_size}
+  device: ${device}
+  num_workers: ${num_workers}
+  offline: ${offline}
+  stream: ${stream}
+  gpu_capacity: 0
+  pinned_capacity: 0
+  tensor_ram_capacity: ${tensor_ram_capacity}
+  ram_capacity: ${ram_capacity}
+  hd_capacity: ${hd_capacity}
+  save: ${offline}
+  load: ${load}
+  mem_size: null
+  partition_workers: false
+  with_replacement: false
+  done_episodes_only: null
+  shuffle: true
+  fetch_per: null
+  prefetch_factor: 3
+  pin_memory: false
+  pin_device_memory: false
+  dataset: ${dataset}
+  aug: null
+  transform: ${transform} # TODO replay.aug: batch-level augmentations after DataLoader sampling but before Memory.save
+  index: step
+  frame_stack: ${frame_stack}
+  nstep: ${nstep}
+  discount: ${discount}
+  agent_specs:
+    norm: ${norm}
+    standardize: ${standardize}
+    obs_spec: ${agent.obs_spec}
+    action_spec: ${agent.action_spec}
+
+logger:
+  _target_: Benchmarking.Logger.Logger
+  path: ${log_path}Benchmarking/Logs/${experiment}/${format:${agent._target_}}/${suite_name}/
+  task: ${task_name}
+  seed: ${seed}
+  generate: ${generate}
+  aggregation: mean
+  log_actions: false
+  wandb: false
+
+vlogger:
+  _target_: Benchmarking.Vlogger.Vlogger
+  path: ${log_path}Benchmarking/Vlogs/${experiment}/${format:${agent._target_}}/${suite_name}/${task_name}_${seed}
+  fps: 20
+  reel: ${generate}
+
+plotting:
+  _target_: Benchmarking.Plot.plot
+  path: ${log_path}Benchmarking/Plots/${experiment}
+  plot_experiments: ${experiment}
+  plot_agents: null
+  plot_suites: null
+  plot_tasks: null
+  steps: null
+  write_tabular: false
+  plot_train: false
+  title: UnifiedML
+  x_axis: Step
+  verbose: false
+
+# -- Language --
+
+Aug: null  # Shorthand for recipes.aug._target_
+
+Eyes: null  # Shorthand for recipes.encoder.eyes._target_
+Pool: null  # Shorthand for recipes.encoder.pool._target_
+Trunk: null  # Shorthand for both trunks' _target_, does not have lowercase counterpart
+Pi_trunk: ${Trunk}  # Shorthand for recipes.actor.trunk._target_
+Q_trunk: ${Trunk}  # Shorthand for recipes.critic.trunk._target_
+Generator: null  # Shorthand for Pi_head --> recipes.actor.Pi_head._target_
+Discriminator: null  # Shorthand for Q_head --> recipes.critic.Q_head._target_
+Predictor: ${Generator}  # Shorthand for Pi_head --> recipes.actor.Pi_head._target_
+Pi_head: ${Predictor}  # Shorthand for recipes.actor.Pi_head._target_
+Q_head: ${Discriminator}  # Shorthand for recipes.critic.Q_head._target_
+
+Policy: null  # Shorthand for recipes.creator.policy._target_
+ActionExtractor: null  # Shorthand for recipes.creator.action_extractor._target_
+
+Optim: null  # Shorthand for recipes.<block>.optim._target_ ,  e.g. python Run.py Optim=Utils.torch.optim.SGD
+Scheduler: null  # Shorthand for recipes.<block>.scheduler._target_
+
+# Shorthands for recipes
+aug:
+  _target_: ${Aug}
+eyes:
+  _target_: ${Eyes}
+pool:
+  _target_: ${Pool}
+pi_trunk:
+  _target_: ${Pi_trunk}
+generator:  # Shorthand for pi_head
+  _target_: ${Pi_head}
+predictor:  # Shorthand for pi_head
+  _default_: ${generator}
+pi_head:
+  _default_: ${predictor}
+q_trunk:
+  _target_: ${Q_trunk}
+discriminator:  # Shorthand for q_head
+  _target_: ${Q_head}
+q_head:
+  _default_: ${discriminator}
+policy:
+  _target_: ${Policy}
+action_extractor:
+  _target_: ${ActionExtractor}
+
+# Global optimizers and schedulers
+optim:
+  _target_: ${Optim}
+scheduler:
+  _target_: ${Scheduler}
+
+# Per-block optimizers and schedulers
+encoder:
+  Optim: ${optim._target_}
+  Scheduler: ${scheduler._target_}
+  optim:
+    _target_: ${encoder.Optim}
+    _default_: ${optim}
+  scheduler:
+    _target_: ${encoder.Scheduler}
+    _default_: ${scheduler}
+actor:
+  Optim: ${optim._target_}
+  Scheduler: ${scheduler._target_}
+  optim:
+    _target_: ${actor.Optim}
+    _default_: ${optim}
+  scheduler:
+    _target_: ${actor.Scheduler}
+    _default_: ${scheduler}
+critic:
+  Optim: ${optim._target_}
+  Scheduler: ${scheduler._target_}
+  optim:
+    _target_: ${critic.Optim}
+    _default_: ${optim}
+  scheduler:
+    _target_: ${critic.Scheduler}
+    _default_: ${scheduler}
+creator:
+  temp_schedule: ${stddev_schedule}
+  Optim: ${optim._target_}
+  Scheduler: ${scheduler._target_}
+  optim:
+    _target_: ${creator.Optim}
+    _default_: ${optim}
+  scheduler:
+    _target_: ${creator.Scheduler}
+    _default_: ${scheduler}
+
+# Recipes
+recipes:
+  aug: ${aug}
+  encoder:
+    Eyes: ${eyes}
+    pool: ${pool}
+    optim: ${encoder.optim}
+    scheduler: ${encoder.scheduler}
+  actor:
+    trunk: ${pi_trunk}
+    Pi_head: ${pi_head}
+    optim: ${actor.optim}
+    scheduler: ${actor.scheduler}
+  critic:
+    trunk: ${q_trunk}
+    Q_head: ${q_head}
+    optim: ${critic.optim}
+    scheduler: ${critic.scheduler}
+  creator:
+    temp_schedule: ${creator.temp_schedule}
+    policy: ${policy}
+    ActionExtractor: ${action_extractor}
+    optim: ${creator.optim}
+    scheduler: ${creator.scheduler}
+
+minihydra:
+  log_dir: ${logger.path}${task_name}_${seed}_Command_Line_Args

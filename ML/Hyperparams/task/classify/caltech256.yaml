@@ -1,0 +1,8 @@
+imports:
+    - classify
+Dataset: torchvision.datasets.Caltech256
+env:
+    low: 0
+    high: 1
+dataset:
+    Transform: null

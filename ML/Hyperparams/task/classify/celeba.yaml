@@ -1,0 +1,8 @@
+imports:
+    - classify
+Dataset: torchvision.datasets.CelebA
+env:
+    low: 0
+    high: 1
+dataset:
+    Transform: transforms.Compose([transforms.Resize(64),transforms.CenterCrop(64)])

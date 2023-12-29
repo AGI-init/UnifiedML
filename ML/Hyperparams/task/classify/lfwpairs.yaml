@@ -1,0 +1,8 @@
+imports:
+    - classify
+Dataset: torchvision.datasets.LFWPairs
+env:
+    low: 0
+    high: 1
+dataset:
+    Transform: null
