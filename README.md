@@ -34,7 +34,7 @@ UnifiedML is a toolbox & engine for defining ML tasks and training them individu
 
 [See full documentation here.](https://agi-init.github.io/UnifiedML)
 
-> This work is an effort to create the best of all worlds in ML: accelerated, accessible and easy, state of the art, and general, to meet every ML need and then some. The purpose of a generalist agent is reflected by the expression "greater than the sum of parts". For each task in a pool of learnable tasks, a singular agent may learn to better generalize not just on each one individually[1^], but on new tasks[^2] due to the generalization of transferable knowledge. In the future, this library will be the easiest way to reproduce ML works. I ask for you to [sponsor]() this work and help provide the necessary compute resources to realize the full potential of this library. UnifiedML is much more than a library.
+> This work is an effort to create the best of all worlds in ML: accelerated, accessible and easy, state of the art, and general, to meet every ML need and then some. The purpose of a generalist agent is reflected by the expression "greater than the sum of parts". For each task in a pool of learnable tasks, a singular agent may learn to better generalize not just on each one individually, but on new tasks due to the generalization of transferable knowledge. In the future, this library will be the easiest way to reproduce ML works. I ask for you to [sponsor]() this work and help provide the necessary compute resources to realize the full potential of this library. UnifiedML is much more than a library.
 
 # Contributing
 
