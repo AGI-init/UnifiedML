@@ -20,3 +20,10 @@ Install
 
 will install UnifiedML.
 
+Table of Contents
+=======
+
+.. toctree::
+   :maxdepth: 1
+
+   src/Quickstart
