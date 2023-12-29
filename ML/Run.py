@@ -4,8 +4,7 @@
 # MIT_LICENSE file in the root directory of this source tree.
 from minihydra import instantiate, get_args, interpolate, Args  # minihydra conveniently and cleanly manages sys args
 
-import Utils
-from Utils import init, MT, MP, save, load
+from Utils import init, MT, adaptive_shaping, MP, save, load
 
 
 @get_args(source='Hyperparams/args.yaml')  # Hyper-param arg files located in ./Hyperparams
@@ -28,8 +27,8 @@ def main(args):
 
     # Agent
     agent = load(args.load_path, args.device, args.agent) if args.load \
-        else instantiate(args.agent, **Utils.adaptive_shaping(obs_spec=args.obs_spec,
-                                                              action_spec=args.action_spec)).to(args.device)
+        else instantiate(args.agent, **adaptive_shaping(obs_spec=args.obs_spec,
+                                                        action_spec=args.action_spec)).to(args.device)
 
     # Synchronize multi-task models (if exist)
     agent = MT.unify_agent_models(agent, args.agent, args.device, args.load and args.load_path)
@@ -50,7 +49,7 @@ def main(args):
                 exp, log, vlog = generalize.rollout(agent.eval(),  # agent.eval() just sets agent.training to False
                                                     vlog=args.log_media)
 
-                logger.eval().log(log, exp=exp if converged else None)  # TODO This won't run if converged and logged
+                logger.eval().log(log, exp=exp if converged else None)
 
             logger.eval().dump_logs()
 
@@ -58,7 +57,7 @@ def main(args):
                 vlogger.dump(vlog, f'{agent.step}')
 
         if args.plot_per_steps and (agent.step + 1) % args.plot_per_steps == 0 and not args.generate or converged:
-            instantiate(args.plotting)  # TODO show=converged + web browser
+            instantiate(args.plotting)
 
         if converged:
             break
@@ -68,7 +67,7 @@ def main(args):
 
         replay.add(experiences)
 
-        if env.episode_done:  # TODO log_per_steps
+        if env.episode_done:
             if args.log_per_episodes and (agent.episode - 2 * replay.offline) % args.log_per_episodes == 0:
                 logger.mode('Train' if training else 'Seed').log(log, dump=True)
 
