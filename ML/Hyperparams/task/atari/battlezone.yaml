@@ -1,4 +1,0 @@
-imports:
-    - atari
-env:
-    game: BattleZone

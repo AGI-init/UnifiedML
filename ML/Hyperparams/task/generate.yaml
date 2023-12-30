@@ -1,5 +1,0 @@
-imports:
-  - classify
-metric: {}
-suite_name: generate
-generate: true

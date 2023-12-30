@@ -1,8 +1,0 @@
-imports:
-    - classify
-Dataset: torchvision.datasets.HMDB51
-env:
-    low: 0
-    high: 1
-dataset:
-    Transform: null
