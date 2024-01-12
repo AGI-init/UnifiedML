@@ -5,10 +5,10 @@ Welcome
 =======
 
 See our library
-`Tributaries <../../../tributaries-ml/src/tributaries>`__ for
-mass-deploying Antelope apps on remote servers.
+`Tributaries <https://github.com/AGI-init/Tributaries>`__ for
+mass-deploying UnifiedML apps on remote servers.
 
-Check out `minihydra / leviathan <../../../minihydra/src/minihydra>`__ for how we handle sys args &
+Check out `minihydra / leviathan <https://github.com/Cave-Dwellers-Tree-People/minihydra>`__ for how we handle sys args &
 hyperparams.
 
 Install
@@ -18,7 +18,7 @@ Install
 
    pip install UnifiedML
 
-will install UnifiedML.
+will install `UnifiedML <https://github.com/AGI-init/UnifiedML>`__.
 
 Table of Contents
 =======
