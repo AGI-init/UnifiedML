@@ -32,22 +32,19 @@ UnifiedML is a toolbox & engine for defining ML tasks and training them individu
 
 #
 
-[See full documentation here.](https://agi-init.github.io/UnifiedML)
+[See full documentation here.](https://agi-init.github.io/UnifiedML) (Documentation in progress)
 
-> This work is an effort to create the best of all worlds in ML: accelerated, accessible and easy, state of the art, and general, to meet every ML need and then some. The purpose of a generalist agent is reflected by the expression "greater than the sum of parts". For each task in a pool of learnable tasks, a singular agent may learn to better generalize not just on each one individually, but on new tasks due to the generalization of transferable knowledge. In the future, this library will be the easiest way to reproduce ML works. I ask for you to [sponsor](https://github.com/sponsors/AGI-init) this work and help provide the necessary compute and resources to realize the full potential of this library. UnifiedML is much more than a library.
+> The unified model to top unified models! UnifiedML is the best of all worlds: accelerated, accessible and easy, state of the art, and general, to meet the need of every domain and then some. By itself, it's a great learner for bootstrapping ML projects, across RL, computer vision, generative modeling, and robotics. Because of its intuitive code, incredible API, and creator’s passion, this library is the easiest way to reproduce individual ML works. But going further, with the development of a generalism API, it has the potential to be AGI, a grand unifying theory, and much more than a library. 
 
 # Contributing
 
 ### Sponsorships & support
 
-This library is built by a single individual from low-income means on almost no funding. [Please support financially by sponsoring if you can](https://github.com/sponsors/AGI-init) and if you have access to compute and resources that you would be willing to contribute, please reach out to me at [agi.init@gmail.com](mailto:agi.init@gmail.com?subject=Contributing).
+This library is built by a single individual from low-income means on the funding of a graduate student wage. [Please support financially by sponsoring if you can](https://github.com/sponsors/AGI-init)  and if you have access to compute and resources that you would be willing to contribute, please reach out to me at [slerman12@gmail.com](mailto:slerman12@gmail.com?subject=Contributing).
 
 ### Push-requests
 
-This library is a work of passion and dedication. The standards for accepted push requests are high, but if you have a push that you would like to make or a contribution that you would like to propose, you may [make a request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/about-collaborative-development-models) and/or leave a note to me either in [issues](https://github.com/AGI-init/UnifiedML/issues) or by email at [agi.init@gmail.com](mailto:agi.init@gmail.com?subject=Contributing).
+This library is built with passion and dedication, and every effort has been made to make it minimal and elegant. The standards for accepted push requests are high, but if you have a push that you would like to make or a contribution that you would like to propose, you may [make a request](https://github.com/AGI-init/UnifiedML/edit/main/README.md) and/or leave a note to me either in [issues](https://github.com/AGI-init/UnifiedML/edit/main/README.md) or by email at [slerman12@gmail.com](mailto:slerman12@gmail.com?subject=Contributing).
 
 Thank you.
 
-#
-
-By [Sam Lerman](https://www.github.com/slerman12).
