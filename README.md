@@ -34,17 +34,35 @@ UnifiedML is a toolbox & engine for defining ML tasks and training them individu
 
 [See full documentation here.](https://agi-init.github.io/UnifiedML) (Documentation in progress)
 
-> The unified model to top unified models! UnifiedML is the best of all worlds: accelerated, accessible and easy, state of the art, and general, to meet the need of every domain and then some. By itself, it's a great learner for bootstrapping ML projects, across RL, computer vision, generative modeling, and robotics. Because of its intuitive code, incredible API, and creator’s passion, this library is the easiest way to reproduce individual ML works. But going further, with the development of a generalism API, it has the potential to be AGI, a grand unifying theory, and much more than a library. 
+[//]: # (TODO: Maybe change "base: import" to "task:" to simplify and perhaps "model:" instead of architecture parts. )
 
-# Contributing
 
-### Sponsorships & support
+# Get started
 
-This library is built by a single individual from low-income means on the funding of a graduate student wage. [Please support financially by sponsoring if you can](https://github.com/sponsors/AGI-init)  and if you have access to compute and resources that you would be willing to contribute, please reach out to me at [slerman12@gmail.com](mailto:slerman12@gmail.com?subject=Contributing).
+To start a train session, use the ```ML``` command:
 
-### Push-requests
+```console
+ML
+```
+
+Defaults:
+
+```dataset=MNIST```
+
+```task=classify```
+
+Plots, logs, generated images, and videos are automatically stored in: ```./Benchmarking```.
+
+# Voluntary support
+
+### Sponsoring
+
+This library is built by a single individual from low-income means on the funding of a graduate student wage. [Please support financially by sponsoring if you can](https://github.com/sponsors/AGI-init) and if you have access to compute and resources that you would be willing to contribute, please reach out to me at [slerman12@gmail.com](mailto:slerman12@gmail.com?subject=Contributing).
+
+<img width="60%" alt="Text changing depending on mode. Light: 'Light' Dark: 'Dark'" src="https://github.com/AGI-init/UnifiedML-legacy/assets/92597756/b57fe485-51f4-4244-b1ef-d7c35600dd48">
+
+### Contributing code
 
 This library is built with passion and dedication, and every effort has been made to make it minimal and elegant. The standards for accepted push requests are high, but if you have a push that you would like to make or a contribution that you would like to propose, you may [make a request](https://github.com/AGI-init/UnifiedML/edit/main/README.md) and/or leave a note to me either in [issues](https://github.com/AGI-init/UnifiedML/edit/main/README.md) or by email at [slerman12@gmail.com](mailto:slerman12@gmail.com?subject=Contributing).
 
 Thank you.
-
