@@ -92,7 +92,9 @@ def plot(path, plot_experiments=None, plot_agents=None, plot_suites=None, plot_t
             # y = 'Accuracy' if 'classify' in suite.lower() \
             #     else 'MSE' if 'regression' in suite.lower() else 'Reward' if 'reward' in cell_data.columns \
             #     else [col for col in cell_data.columns if col not in ['time', 'step', 'frame', 'epoch', 'fps']][0]
-            y = [col for col in cell_data.columns if col.lower() not in ['time', 'step', 'frame', 'epoch', 'fps']][0]
+            y = [col for col in cell_data.columns if col.lower()
+                 not in ['time', 'step', 'frame', 'epoch', 'fps', 'agent', 'suite', 'task', 'seed', 'episode']
+                 and not cell_data[col].isnull().values.any()][0]
 
             sns.lineplot(x=x, y=y, data=cell_data, ci='sd', hue='Agent', hue_order=np.sort(hue_names), ax=ax,
                          palette=cell_palettes)
@@ -127,7 +129,9 @@ def plot(path, plot_experiments=None, plot_agents=None, plot_suites=None, plot_t
             # y = 'Accuracy' if 'classify' in ax_title.lower() \
             #     else 'MSE' if 'regression' in ax_title.lower() else 'Reward' if 'reward' in cell_data.columns \
             #     else [col for col in cell_data.columns if col not in ['time', 'step', 'frame', 'epoch', 'fps']][0]
-            y = [col for col in cell_data.columns if col.lower() not in ['time', 'step', 'frame', 'epoch', 'fps']][0]
+            y = [col for col in cell_data.columns if col.lower()
+                 not in ['time', 'step', 'frame', 'epoch', 'fps', 'agent', 'suite', 'task', 'seed', 'episode']
+                 and not cell_data[col].isnull().values.any()][0]
 
             # Normalize
             for task in cell_data.Task.unique():
@@ -176,11 +180,15 @@ def plot(path, plot_experiments=None, plot_agents=None, plot_suites=None, plot_t
             min_time = min_time[0]  # if so, use that time
 
         # Only show results for a consistent step count
+        # TODO Allow results for differing step counts (non-uniform step count).
+        #  Otherwise, RL and Classify become hard to plot together since RL logs by the 1000s while Classify
+        #  logs by the 100s
         performance = performance[performance['Step'] == min_steps]
 
         # Score name y-axis
         metrics = [metric
-                   for metric in performance.columns if metric.lower() not in ['time', 'step', 'frame', 'epoch', 'fps']]
+                   for metric in performance.columns if metric.lower() not in
+                   ['time', 'step', 'frame', 'epoch', 'fps', 'agent', 'suite', 'task', 'seed', 'episode']]
 
         # Use Reward or Accuracy as "Score"
         performance['Score'] = performance[metrics[0]]

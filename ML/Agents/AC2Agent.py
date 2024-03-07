@@ -34,7 +34,7 @@ class Agent(torch.nn.Module):
                  ):
         super().__init__()
 
-        self.discrete = discrete and not generate  # Discrete & Continuous supported!
+        self.discrete = discrete and not generate  # Discrete & continuous supported!
         self.supervise = supervise  # And classification...
         self.classify = action_spec.discrete  # Regression
         self.RL = RL or generate  # RL,
@@ -76,7 +76,6 @@ class Agent(torch.nn.Module):
 
             action_spec.discrete_bins = num_actions  # Continuous env has no discrete bins by default, must specify
 
-        # Note: Slower unnecessary EMA updates when not RL or EMA
         self.encoder = CNNEncoder(obs_spec, standardize=standardize, norm=norm, **recipes.encoder, parallel=parallel,
                                   lr=lr, lr_decay_epochs=lr_decay_epochs, weight_decay=weight_decay,
                                   ema_decay=ema_decay * (RL and not generate and depth or ema))
@@ -257,7 +256,7 @@ class Agent(torch.nn.Module):
 
             # Critic loss
             critic_loss = QLearning.ensembleQLearning(self.critic, self.actor, batch.obs, batch.action, batch.reward,
-                                                      batch.discount, getattr(batch, 'next_obs', None),
+                                                      batch.get('discount', 1), batch.get('next_obs', None),
                                                       self.step, log=log)
 
             # "Foretell"

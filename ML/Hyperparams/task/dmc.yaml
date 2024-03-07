@@ -1,14 +1,10 @@
+imports:
+    - RL
 Env: World.Environments.DMC.DMC
 env:
     task: cheetah_run
 task_name: ${env.task}
 discrete: false
-action_repeat: 2
-frame_stack: 3
-nstep: 3
-train_steps: 1500000
-stddev_schedule: 'linear(1.0,0.1,500000)'
 hd_capacity: 1e6
-
 
 

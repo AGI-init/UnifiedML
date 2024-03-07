@@ -5,8 +5,9 @@ task: classify/mnist
 Agent: Agents.Agent
 Model: ${Agent}
 obs_spec: {}
-action_spec:
-  discrete: ???
+action_spec: {}
+_obs_spec_: ???  # So that Env can modify obs_spec before interpolation to Agent & Replay
+_action_spec_: ???  # So that Env can modify action_spec before interpolation to Agent & Replay
 num_actions: 1
 standardize: true
 norm: 0.5  # Note: ignored / mutually exclusive if standardize
@@ -19,13 +20,14 @@ lr_decay_epochs: null
 weight_decay: 0
 ema_decay: 0.99
 stddev_schedule: ${stddev_schedule}
-num_critics: 2
+num_critics: 1
 num_actors: 1
 # Domains
 online: true  # Shorthand for not offline
 offline: ${not:${online}}  # Defaults to true for classify tasks
 stream: false
-discrete: ${action_spec.discrete}
+continuous: ${not:${action_spec.discrete}}  # Shorthand for not discrete
+discrete: ${not:${continuous}}
 RL: true  # Defaults to false for classify tasks
 supervise: true
 generate: false
@@ -70,9 +72,10 @@ discount: 0.99
 transform: null
 # Training
 seed_steps: 2000
+train_steps: 200000
 learn_per_steps: 2
 learn_steps: 1
-learn_steps_after: 20000
+learn_steps_after: 0
 # Evaluating
 evaluate_per_steps: 5000
 evaluate_episodes: 1
@@ -91,7 +94,9 @@ load_per_steps: 0
 vlog: ${generate}  # Shorthand for render
 render: ${vlog}  # Shorthand for log_media
 log_media: ${render}
-log_per_episodes: 1
+log_per_epochs: 1  # Shorthand for log_per_episodes
+log_per_episodes: ${log_per_epochs}
+log_per_steps: 0
 # Plotting
 plot_per_steps: 50000
 # Misc
@@ -131,8 +136,8 @@ model:
 
 agent:
   _target_: ${model._target_}
-  obs_spec: ${obs_spec}
-  action_spec: ${action_spec}
+  obs_spec: ${_obs_spec_}
+  action_spec: ${_action_spec_}
   num_actions: ${num_actions}
   trunk_dim: ${trunk_dim}
   hidden_dim: ${hidden_dim}

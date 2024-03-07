@@ -42,6 +42,7 @@ class Replay:
         self.begin_flag = Flag()  # Wait until first call to sample before initial fetch
 
         self.last_batch_size = None
+        self.partitions = 0
 
         if self.stream:
             return
@@ -250,7 +251,7 @@ class Replay:
                 self._replay = None  # Reset iterator when depleted
                 sample = next(self.replay)
 
-        self.last_batch_size = len(sample['obs'])
+        self.last_batch_size = len(sample.get('obs', next(iter(sample.values()))))
 
         return Batch({key: torch.as_tensor(value).to(device=self.device, non_blocking=True)
                       for key, value in sample.items()})
@@ -446,11 +447,12 @@ class Worker:
         # Future
         if self.nstep:
             # Transition
-            experience.action = episode[step + 1].action
+            experience.action = episode[step].action
 
             traj_r = torch.as_tensor([float(experience.reward)
-                                      for experience in episode[step + 1:step + self.nstep + 1]])
+                                      for experience in episode[step:min(len(episode) - 1, step + self.nstep)]])
 
+            # experience['next_obs'] = frame_stack(episode, 'obs', step + len(traj_r) - 1)
             experience['next_obs'] = frame_stack(episode, 'obs', step + len(traj_r))
 
             # Trajectory TODO
@@ -458,9 +460,9 @@ class Worker:
                 experience['traj_r'] = traj_r
                 traj_o = np.concatenate([episode['obs'][max(0, idx - i):max(idx + self.nstep + 1 - i, self.nstep + 1)]
                                          for i in range(self.frame_stack - 1, -1, -1)], 1)  # Frame_stack
-                traj_a = episode['action'][idx + 1:idx + self.nstep + 1]
+                traj_a = episode['action'][idx:idx + self.nstep]
                 if 'label' in experience:
-                    traj_l = episode['label'][idx:idx + self.nstep + 1]
+                    traj_l = episode['label'][idx:idx + self.nstep]
 
             # Cumulative discounted reward
             discounts = self.discount ** np.arange(len(traj_r) + 1)

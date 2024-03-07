@@ -21,26 +21,16 @@ from minihydra import Args
 
 class Atari:
     """
-    A general-purpose environment:
-
-    Must accept: **kwargs as init arg.
-
-    Must have:
+    A general-purpose environment must have:
 
     (1) a "step" function, action -> exp
     (2) "reset" function, -> exp
-    (3) "render" function, -> image
-    (4) "episode_done" attribute
-    (5) "obs_spec" attribute which includes:
+    (3) "obs_spec" attribute which includes:
         - "shape", "mean", "stddev", "low", "high" (the last 4 can be None)
-    (6) "action-spec" attribute which includes:
+    (4) "action-spec" attribute which includes:
         - "shape", "discrete_bins" (should be None if not discrete), "low", "high", and "discrete"
-    (7) "exp" attribute containing the latest exp
 
-    Recommended: Discrete environments should have a conversion strategy for adapting continuous actions (e.g. argmax)
-
-    An "exp" (experience) is an Args consisting of "obs", "action" (prior to adapting), "reward", and "label"
-    as numpy arrays with batch dim or None. "reward" is an exception: should be numpy array, can be empty/scalar/batch.
+    An "exp" (experience) is a dict consisting of keys such as "obs", "action", "reward", and "label".
 
     ---
 
@@ -49,7 +39,7 @@ class Atari:
     """
     def __init__(self, game='Pong', seed=0, frame_stack=3, action_repeat=4,
                  screen_size=84, color='grayscale', sticky_action_proba=0, action_space_union=False,
-                 last_2_frame_pool=True, terminal_on_life_loss=False, **kwargs):  # Atari-specific
+                 last_2_frame_pool=True, terminal_on_life_loss=False):  # Atari-specific
         self.episode_done = False
 
         # Make env
@@ -92,34 +82,23 @@ class Atari:
 
         # Number of channels
         self.color = color
-        channels = 3 if color == 'rgb' else 1
 
-        self.obs_spec = Args({'shape': (channels * frame_stack, screen_size, screen_size),
-                              'mean': None,
-                              'stddev': None,
-                              'low': 0,
-                              'high': 255})
+        self.screen_size = screen_size
 
-        self.action_spec = Args({'shape': (1,),
-                                 'discrete_bins': self.env.action_space.n,
-                                 'low': 0,
-                                 'high': self.env.action_space.n - 1,
-                                 'discrete': True})
+        self.obs_spec = {'low': 0, 'high': 255}
+        self.action_spec = {'discrete_bins': self.env.action_space.n}
 
-        self.exp = None
-
-        self.action_repeat = action_repeat or 1
-        self.frames = deque([], frame_stack or 1)
+        self.action_repeat = action_repeat or 1 # action_repeat attribute
+        self.frames = deque([], frame_stack or 1)  # For frame_stack method
 
     def step(self, action):
-        # Adapt to discrete!
-        _action = self.adapt_to_discrete(action)
-        _action.shape = self.action_spec['shape']
+        # Remove batch dim
+        action = np.reshape(action, self.action_spec['shape'])
 
         # Step env
         reward = np.zeros([])
         for _ in range(self.action_repeat):
-            obs, _reward, self.episode_done, _, _ = self.env.step(int(_action))  # Atari requires scalar int action
+            obs, _reward, self.episode_done, _, _ = self.env.step(int(action))  # Atari requires scalar int action
             reward += _reward
             if self.last_2_frame_pool:
                 last_frame = self.last_frame
@@ -144,18 +123,16 @@ class Atari:
         elif self.color == 'rgb':
             obs = obs.transpose(2, 0, 1)  # Channel-first
 
-        # Resize image
-        obs = resize(as_tensor(obs), self.obs_spec['shape'][1:], antialias=True).numpy()
+        # Resize image  TODO Via env.transform?
+        obs = resize(as_tensor(obs), (self.screen_size, self.screen_size), antialias=True).numpy()
 
         # Add batch dim
         obs = np.expand_dims(obs, 0)
 
-        # Create experience
-        exp = {'obs': obs, 'action': action, 'reward': reward, 'done': self.episode_done}  # TODO Auto-done
+        prev = {'reward': reward}  # Reward for previous action
+        now = {'obs': obs, 'done': self.episode_done}  # New state  # TODO Auto-done
 
-        self.exp = Args(exp)  # Experience
-
-        return {'reward': reward}, {'obs': obs, 'done': self.episode_done}
+        return prev, now
 
     def frame_stack(self, obs):
         if self.frames.maxlen == 1:
@@ -183,7 +160,7 @@ class Atari:
             obs = obs.transpose(2, 0, 1)  # Channel-first
 
         # Resize image
-        obs = resize(as_tensor(obs), self.obs_spec['shape'][1:], antialias=True).numpy()
+        obs = resize(as_tensor(obs), (self.screen_size, self.screen_size), antialias=True).numpy()
 
         # Add batch dim
         obs = np.expand_dims(obs, 0)
@@ -194,27 +171,7 @@ class Atari:
         # Reset frame stack
         self.frames.clear()
 
-        self.exp = Args(exp)  # Experience
-
-        return self.exp
+        return Args(exp)
 
     def render(self):
         return self.env.render()
-
-    def adapt_to_discrete(self, action):
-        shape = self.action_spec['shape']
-
-        try:
-            action = action.reshape(len(action), *shape)  # Assumes a batch dim
-        except (ValueError, RuntimeError):
-            try:
-                action = action.reshape(len(action), -1, *shape)  # Assumes a batch dim
-            except:
-                raise RuntimeError(f'Discrete environment could not broadcast or adapt action of shape {action.shape} '
-                                   f'to expected batch-action shape {(-1, *shape)}')
-            action = action.argmax(1)
-
-        discrete_bins, low, high = self.action_spec['discrete_bins'], self.action_spec['low'], self.action_spec['high']
-
-        # Round to nearest decimal/int corresponding to discrete bins, high, and low
-        return np.round((action - low) / (high - low) * (discrete_bins - 1)) / (discrete_bins - 1) * (high - low) + low

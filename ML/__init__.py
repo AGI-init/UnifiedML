@@ -25,7 +25,7 @@ for dir in dirs:
 
 
 # Executes from code
-def ml(args=None, **kwargs):
+def ML(args=None, **kwargs):
     # Only run in __main__ call and MainProcess, not imports or forks
     _main_ = sys._getframe(1).f_globals["__name__"] == '__main__' and mp.current_process().name == 'MainProcess'
     from Run import main
@@ -37,8 +37,9 @@ def ml(args=None, **kwargs):
     return (None,) * len_return_variables(main)
 
 
-run = launch = main = ml  # Pseudonyms
+run = launch = main = ml = ML  # Pseudonyms
 
 from Agents import Agent
-from Utils import load, save, optimize
+from Utils import load, save, optimize, normalize, standardize
+from Benchmarking.Plot import plot as Plot
 from Benchmarking.Plot import plot

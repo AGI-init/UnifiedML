@@ -2,5 +2,7 @@ action_repeat: 2
 frame_stack: 3
 nstep: 3
 train_steps: 1500000
+learn_steps_after: 20000
+num_critics: 2
 stddev_schedule: 'linear(1.0,0.1,500000)'
 hd_capacity: 0

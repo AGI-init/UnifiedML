@@ -15,7 +15,8 @@ from Agents.Losses import QLearning, PolicyLearning
 
 
 class DrQV2Agent(torch.nn.Module):
-    """Data Regularized Q-Learning version 2 (https://arxiv.org/abs/2107.09645)"""
+    """Data Regularized Q-Learning version 2 (https://arxiv.org/abs/2107.09645)
+    State of the art reinforcement learner"""
     def __init__(self,
                  obs_spec, action_spec, trunk_dim, hidden_dim,  # Architecture
                  lr, ema_decay,  # Optimization

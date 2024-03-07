@@ -4,7 +4,6 @@
 # MIT_LICENSE file in the root directory of this source tree.
 import csv
 import datetime
-import inspect
 import re
 import time
 from pathlib import Path
@@ -14,8 +13,6 @@ import numpy as np
 import pandas as pd
 
 import torch
-
-from minihydra import get_module, instantiate
 
 
 def shorthand(log_name):
@@ -61,11 +58,15 @@ class Logger:
             else None
 
         # Agent-specific properties & logging
+        self.step = 0
         self.model = model
         if witness is not None:
             self.witness(witness)
 
-    def log(self, log, dump=False, exp=None):
+    def log(self, log, dump=False, step=None):
+        if step is not None:
+            self.step = step
+
         if log:
 
             if self.name not in self.logs:
@@ -78,31 +79,15 @@ class Logger:
                     item = item.detach().cpu().numpy()
                 logs[log_name] = logs[log_name] + [item] if log_name in logs else [item]
 
-            if self.predicted is not None and exp is not None:
-                for exp in exp:
-                    if self.name not in self.predicted:
-                        self.predicted[self.name] = {'Predicted': [], 'Actual': []}
-                    action = exp.action.squeeze()
-                    if exp.action.shape[1] > 1:  # Assumes classification
-                        if self.name not in self.probas:
-                            self.probas[self.name] = []
-                        self.probas[self.name].append(action)
-                        # Corner case when Eval batch size is 1, batch dim gets squeezed out
-                        for value in self.probas[self.name]:
-                            if len(value.shape) <= 1:
-                                value.shape = (1, *value.shape)
-                        action = exp.action.argmax(1).squeeze()
-                    self.predicted[self.name]['Predicted'].append(action)
-                    self.predicted[self.name]['Actual'].append(exp.label.squeeze())
-                    # Corner case when Eval batch size is 1, batch dim gets squeezed out
-                    for key, value in self.predicted[self.name].items():
-                        value[-1].shape = value[-1].shape or (1,)
-
         if dump:
-            self.dump_logs()
+            self.dump()  # Dump logs
 
-    def dump_logs(self):
-        if self.name is None:
+    def dump(self, exp=None):
+        if exp is not None:
+            self.log_actions(exp)
+        if not self.logs:
+            self.dump_actions()
+        elif self.name is None:
             # Iterate through all logs
             for name in self.logs:
                 for log_name in self.logs[name]:
@@ -111,10 +96,7 @@ class Logger:
                 self._dump_logs(self.logs[name])
                 self.dump_actions(self.logs[name])
             self.logs = {}
-        else:
-            # Iterate through just the named log
-            if self.name not in self.logs:
-                return
+        elif self.name in self.logs:  # Iterate through just the named log
             for log_name in self.logs[self.name]:
                 agg = self.aggregate(log_name)
                 self.logs[self.name][log_name] = agg(self.logs[self.name][log_name])
@@ -123,11 +105,35 @@ class Logger:
             self.logs[self.name] = {}
             del self.logs[self.name]
 
-    def dump_actions(self, logs):
+    def log_actions(self, exp):
+        # Extract predicted (action) and actual (label) from experience in classification. Argmax if action shape > (1,)
+        if self.predicted is not None:
+            for exp in exp:
+                if self.name not in self.predicted:
+                    self.predicted[self.name] = {'Predicted': [], 'Actual': []}
+                action = exp.action.squeeze()
+                if exp.action.shape[1] > 1:  # Assumes classification
+                    if self.name not in self.probas:
+                        self.probas[self.name] = []
+                    self.probas[self.name].append(action)
+                    # Corner case when Eval batch size is 1, batch dim gets squeezed out
+                    for value in self.probas[self.name]:
+                        if len(value.shape) <= 1:
+                            value.shape = (1, *value.shape)
+                    action = exp.action.argmax(1).squeeze()
+                self.predicted[self.name]['Predicted'].append(action)
+                self.predicted[self.name]['Actual'].append(exp.label.squeeze())
+                # Corner case when Eval batch size is 1, batch dim gets squeezed out
+                for key, value in self.predicted[self.name].items():
+                    value[-1].shape = value[-1].shape or (1,)
+
+    def dump_actions(self, logs=None):
+        step = int((logs or {}).get('step', self.step))
+
+        # Dump Predicted_vs_Actual in classification
         if self.predicted is not None and self.name in self.predicted \
                 and len(self.predicted[self.name]['Predicted']) > 0 \
                 and len(self.predicted[self.name]['Actual']) > 0:
-            assert 'step' in logs
 
             file_name = Path(self.path) / f'{self.task}_{self.seed}_Predicted_vs_Actual_{self.name}.csv'
 
@@ -135,18 +141,19 @@ class Logger:
                 self.predicted[self.name][key] = np.concatenate(self.predicted[self.name][key])
 
             df = pd.DataFrame(self.predicted[self.name])
-            df['Step'] = int(logs['step'])
+            df['Step'] = step
             df.to_csv(file_name, index=False)
 
             self.predicted[self.name] = {'Predicted': [], 'Actual': []}
 
+        # Dump "predicted probabilities" in classification if action shape was greater than (1,)
         if self.probas is not None and self.name in self.probas:
             file_name = Path(self.path) / f'{self.task}_{self.seed}_Predicted_Probas_{self.name}.csv'
 
             self.probas[self.name] = np.concatenate(self.probas[self.name])
 
             df = pd.DataFrame(self.probas[self.name], columns=list(range(self.probas[self.name][0].shape[-1])))
-            df['Step'] = int(logs['step'])
+            df['Step'] = step
             df.to_csv(file_name, index=False)
 
             self.probas[self.name] = []
@@ -289,21 +296,21 @@ class Logger:
                 setattr(target, key, property(lambda m, _key_=key: m._defaults_[_key_],
                                               lambda m, new_value, _key_=key: m._defaults_.update({_key_: new_value})))
 
-    def re_witness(self, logs, agent, replay):
-        if logs is not None:
-            logs.update(time=time.time() - agent.birthday, step=agent.step, frame=agent.frame, episode=agent.episode)
+    def re_witness(self, log, agent, replay):
+        logs = log or {}
 
-            # Online -> Offline conversion
-            if replay.offline:
-                agent.step += 1
-                agent.frame += replay.last_batch_size
-                agent.epoch = logs['epoch'] = replay.epoch
-                logs['frame'] += 1  # Offline is 1 behind Online in training loop
-                logs.pop('episode')
-            else:
-                logs.pop('epoch')
+        logs.update(time=time.time() - agent.birthday, step=agent.step, frame=agent.frame, episode=agent.episode)
 
-            self.log(logs)
+        # Online -> Offline conversion
+        if replay.offline:
+            agent.step += 1
+            agent.frame += replay.last_batch_size
+            # agent.epoch = logs['epoch'] = replay.epoch
+            agent.epoch = logs['epoch'] = logs['episode'] if replay.stream else replay.epoch
+            logs['frame'] += 1  # Offline is 1 behind Online in training loop
+            logs.pop('episode')
+        elif 'epoch' in logs:
+            logs.pop('epoch')
 
     def seed(self):
         return self.mode('Seed')

@@ -21,7 +21,7 @@ class YouTube:
         self.steps = steps  # Controls evaluation episode length
         self.episode_step = 0
 
-    def step(self, action=None):
+    def step(self, action):
         return self.reset()
 
     def reset(self):

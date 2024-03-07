@@ -3,3 +3,6 @@ imports:
 metric: {}
 suite_name: generate
 generate: true
+
+# Default architectures for AC2Agent, can ignore
+generator: MLP

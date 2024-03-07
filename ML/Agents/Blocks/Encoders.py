@@ -28,10 +28,10 @@ class CNNEncoder(nn.Module):
             setattr(self, key, None if getattr(obs_spec, key, None) is None else torch.as_tensor(obs_spec[key]))
 
         self.standardize = \
-            standardize and None not in [self.mean, self.stddev]  # Whether to center-scale (0 mean, 1 stddev)
-        self.normalize = norm and None not in [self.low, self.high]  # Whether to shift-max scale
+            standardize and None not in [self.mean, self.stddev]  # Whether to center-scale (e.g. 0 mean, 1 stddev)
+        self.normalize = norm and None not in [self.low, self.high]  # Whether to shift-max scale (False if norm=0)
 
-        self.norm = norm  # Can control normalization range, default: [-1, 1]
+        self.norm = norm  # Can control normalization width (e.g. [-1, 1] if norm=True since True is 1)
 
         # Dimensions
         obs_shape = [*(1,) * (len(self.obs_shape) < 2), *self.obs_shape]  # Create at least 1 channel dim & spatial dim
@@ -102,7 +102,7 @@ class CNNEncoder(nn.Module):
                 raise RuntimeError('\nOutput shape after pooling does not match pre-computed repr_shape '
                                    f'{tuple(h.shape[1:])}≠{self.repr_shape}')
 
-        h = h.view(*batch_dims, *h.shape[1:])  # Restore leading dims
+        h = h.view(*batch_dims, *h.shape[1:])  # Restore leading dims [transform= w/o equal env.transform= can break it]
         return h
 
 

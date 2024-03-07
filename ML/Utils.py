@@ -59,7 +59,7 @@ def init(args):
     mps = getattr(torch.backends, 'mps', None)  # M1 MacBook speedup
 
     # Set device
-    args.device = args.device if args.device != '???' else 'cuda' if torch.cuda.is_available() \
+    args.device = args.device.lower() if args.device != '???' else 'cuda' if torch.cuda.is_available() \
         else 'mps' if mps and mps.is_available() \
         else 'cpu'
 
@@ -127,11 +127,12 @@ def preconstruct_agent(agent, model):
             if key in args:
                 agent.pop(key)
 
-        # Use Eyes when no output shape, else Pi_head
+        # Use Eyes when no output shape, else Pi_head TODO Maybe use Pi_head whenever args.generate and input shape? ins
         if outs:
             agent.recipes.actor.Pi_head = args  # As Pi_head when output shape
             agent.recipes.encoder.Eyes = agent.recipes.encoder.pool = agent.recipes.actor.trunk = Identity()
-        else:
+        else:  # TODO What if user wants to use fixed shapes but not the default trunk/Pi_head? Require shape args?
+            #         Or maybe adaptively set (either in Agent or somehow here) based on whether output matches expected
             agent.recipes.encoder.Eyes = args  # Otherwise as Eyes
 
         # Override agent act method with model
@@ -183,9 +184,10 @@ def preconstruct_agent(agent, model):
 
     signature = set(inspect.signature(act).parameters) - {'self'}
 
-    # Act store optional
-    if len(signature) == 1:
-        agent.setdefault('_overrides_', Args()).act = lambda a, obs, store: act(a, obs)
+    # Act signature adaptive
+    agent.setdefault('_overrides_', Args()).act = lambda a, *v, **k: \
+        act(a, *v[:len(signature)], **{p: k[p] for p in list(signature)[len(v):]})
+    agent.setdefault('_overrides_', Args())['get_act_signature'] = lambda a, *v, **k: signature
 
 
 # Saves model + args + selected attributes
@@ -200,7 +202,7 @@ def save(path, model, args=None, *attributes):
 
 
 # Loads model or part of model
-def load(path, device='cuda', args=None, preserve=(), distributed=False, attr='', **kwargs):
+def load(path, device='cuda', args=None, preserve=(), attr='', **kwargs):
     while True:
         try:
             to_load = torch.load(path, map_location=device, pickle_module=dill)  # Load
@@ -217,7 +219,7 @@ def load(path, device='cuda', args=None, preserve=(), distributed=False, attr=''
                 args = original_args  # If already instantiated, use instantiated
             break
         except Exception as e:  # Pytorch's load and save are not atomic transactions, can conflict in distributed setup
-            if not distributed:
+            if not preserve:
                 raise RuntimeError(e)
             warnings.warn(f'Load conflict, resolving...')  # For distributed training
 
@@ -236,7 +238,7 @@ def load(path, device='cuda', args=None, preserve=(), distributed=False, attr=''
 
     # Load saved attributes as well
     for key, value in to_load['attr'].items():
-        if (hasattr(model, key) or key in getattr(model, '_defaults_', {})) and key not in ['state_dict', *preserve]:
+        if key not in ['state_dict', *preserve]:
             setattr(model, key, value)
 
     # Can also load part of a model. Useful for recipes,
@@ -402,7 +404,9 @@ MT = MultiTask()
 # python XRD.py multi_task='["task=NPCNN Eyes=XRD.Eyes","task=SCNN Eyes=XRD.Eyes"]'
 
 
-# Allows module to support either full batch args with modalities or single-modal (e.g. "obs")
+# Allows module to support either full batch-args with modalities (e.g. "exp" with attributes like exp.obs
+# and exp.reward) or single-modal (e.g. "obs")
+#   - Makes API for transforms and augmentations (and later, to-do: architecture parts) more adaptively multi-modal
 class Modals(nn.Module):
     def __init__(self, module, modal='obs', device=None):
         super().__init__()
@@ -413,18 +417,21 @@ class Modals(nn.Module):
         self.device = device
 
     def forward(self, exp, device=None):
-        if isinstance(exp, dict):
+        # if isinstance(exp, dict):
+        if isinstance(exp, (dict, Args)):  # Note I recently made this make a new Args-dict even if already an Args-dict
             exp = Args(exp)
 
         # Is it an exp?
-        if isinstance(exp, Args) and self.modal in exp:
-            exp[self.modal] = self.to(exp[self.modal], device=device)
+        if isinstance(exp, Args):
+            if self.modal in exp:
+                exp[self.modal] = self.to(exp[self.modal], device=device)
         else:
             exp = self.to(exp, device=device)
 
         # Adapt to experience (exp.obs) or full exp
         if self.module is not None:
             if isinstance(exp, Args) and self.modal in exp:
+                # _exp_ and _batch_ are boolean flags that toggle passing in full exp/batch-dict instead of just obs
                 if getattr(self.module, '_exp_', getattr(self.module, '_batch_', None)) is None:
                     exp[self.modal] = self.module(exp[self.modal])
                 else:
@@ -434,9 +441,8 @@ class Modals(nn.Module):
 
         return exp
 
-    def to(self, exp, device=None):
-        return torch.as_tensor(exp, device=device or self.device) if device is not None or \
-                                                                     self.device is not None else torch.as_tensor(exp)
+    def to(self, datum, device=None):
+        return torch.as_tensor(datum, device=device or self.device or getattr(datum, 'device', 'cpu'))
 
 
 # Adaptively fills shaping arguments in instantiated Pytorch modules
@@ -621,6 +627,16 @@ def repr_shape(input_shape, *blocks):
     else:
         input_shape = shape
     return input_shape
+
+
+# Helper function for center-scaling (e.g. 0 mean, 1 stddev)
+def standardize(x, mean=0, stddev=1):
+    return (x - mean) / stddev
+
+
+# Helper function for shift-max scaling (e.g. between [-width, width]) given low/high (min/max) of data stats
+def normalize(x, low, high, width=1):
+    return (width * 2) * (x - low) / (high - low) - width
 
 
 # Replaces tensor's batch items with Normal-sampled random latent
@@ -908,7 +924,8 @@ def import_paths():
     # added_modules.update(globals())  # Adds everything in Utils to module instantiation path
 
     # For direct accessibility via command line
-    module_paths.extend(['World.Environments', 'Agents.Blocks.Architectures', 'Agents.Blocks.Augmentations', 'Agents'])
+    module_paths.extend(['World.Environments', 'Agents.Blocks.Architectures', 'Agents.Blocks.Augmentations', 'Agents',
+                         'World'])
     added_modules.update({'torchvision': torchvision, 'transforms': transforms, 'nn': nn, 'Identity': Identity,
                           'Flatten': Flatten, 'Sequential': Sequential, 'load': load, 'save': save})
 

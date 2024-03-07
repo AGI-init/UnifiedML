@@ -18,182 +18,144 @@ from minihydra import Args
 
 class Datums:
     """
-    A general-purpose environment must have a step function, reset function, obs_spec, and action_spec
+    Envs must:
+    (1) have a step(action) function
+    (2) have a reset() function
 
-    The step and reset functions output "experiences"
-        i.e. dicts containing datums like "obs", "reward", 'label", "done"
+        The step() and reset() functions output experiences ("exp")
+            i.e. dicts containing datums like "obs", "action", "reward", 'label", "done"
+
+        In the step() function, instead of outputting one experience, can output a (prev, now) pair of experiences.
+        Some datums, such as reward, are time-delayed and specifying them in a separate "prev" experience makes
+        it possible to pair corresponding pairs without time-delay for metrics and Replay.
+
+        The end of an episode or epoch may be marked by the "done" boolean. If unspecified, it will be assumed True
+        during step() calls.
+            - This sequence demarcation can be useful for aggregating metrics (e.g. based on multiple steps or an epoch
+              of batches) or for the automatic organizing of temporal data in Replay.
+
+            - The "done" step doesn't get acted on. Its contents can be a no-op (either output None or just
+              {'done': True}), or, if you're using (prev, now) pairs, the prev experience in a done state should still
+              include any additional datums needed for logging or storing in Replay, such as "reward". It shouldn't
+              include the "done" key. The now state, which should hold the "done" key or be None, is ignored if it holds
+              no other key, otherwise it's also sent to Replay and can be retrieved as a "next_obs" for RL for example.
+            - The reset() state can't ever be a "done" state even if you specify it as such. In that case,
+              output None from your step() function.
+
+    Envs can:
+    (1) have an obs_spec dict as an attribute
+    (2) have an action_spec dict as an attribute
+    (3) include a render() method, frame_stack(obs) method, and/or an action_repeat init arg that Env should adapt to
+        and include as a self.action_repeat int attribute
+
+        (1) and (2) if you want custom input/output spec info to be passed to your Agent/Model (as dicts/Args).
+        The Environment infers many input/output specs by default. For example, obs_spec.shape often is automatically
+        included since it can be inferred from an "obs"-key value of the reset() function. action_spec.shape
+        from a "label" if present.
+
+        - For obs_spec, besides "shape", these stats can include for example: "shape", "mean", "stddev", "low", "high".
+        Useful for standardization and normalization.
+
+        - For action_spec, these stats can include for example: "shape", "discrete_bins", "low", "high", "discrete".
+        For discrete action spaces and action normalization. Many of these can be inferred,
+        and see Environment.py "action_spec" @property for what the defaults are if left unspecified.
+
+        All of this is optional and doesn't have to be used / can be ignored. Include obs_spec and action_spec as
+        args in your Agent/Model's __init__ method to get access to the configured specs of the Env.
+
+        See DMC.py and Atari.py for examples of frame_stack(obs) and action_repeat. Used commonly in RL.
+        Video logging online rollouts can be facilitated by the render() method. Also can be ignored.
 
     ---
 
     Datasets must:
-    - extend Pytorch Datasets
-    - output (obs, label) pairs
+    (1) extend Pytorch Datasets
+    (2) output (obs, label) pairs, or dicts of named datums, e.g., {'obs': obs, 'label': label, ...}
+
+        Accessed in the API via dataset= and/or test_dataset=.
 
     Datasets can:
-    - include a "classes" attribute that lists the different class names or classes
+    (1) include a "classes" attribute that lists the different class names or classes
 
-    The "step" function has a no-op default action (action=None) to allow for Offline-mode streaming.
+        This allows quick and exact computation of number of classes being predicted from, without having to count
+        via iterating through the whole dataset.
     """
-    def __init__(self, dataset, test_dataset=None, train=True, offline=True, generate=False, batch_size=8,
-                 num_workers=1, low=None, high=None, standardize=False, norm=False, device='cpu', **kwargs):
+    def __init__(self, dataset, test_dataset=None, train=True, stream=False, batch_size=8, num_workers=1,
+                 standardize=False, norm=False, device='cpu'):
         if not train and test_dataset is not None:
-            # Inherit from test_dataset
+            # Assume test_dataset
             dataset = test_dataset
 
+        # (This might not generally be necessary)
         _, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)  # Shared memory can create a lot of file descriptors
         resource.setrlimit(resource.RLIMIT_NOFILE, (hard_limit, hard_limit))  # Increase soft limit to hard limit
 
         dataset = load_dataset('World/ReplayBuffer/Offline/', dataset, allow_memory=False, train=train)
 
+        discrete = hasattr(dataset, 'classes')  # load_dataset adds a .classes attribute to the dataset if discrete
+
         # CPU workers
         num_workers = max(1, min(num_workers, os.cpu_count()))
 
-        # TODO Support using Replay (by default)
         self.batches = DataLoader(dataset=dataset,
                                   batch_size=batch_size,
                                   shuffle=True,
                                   num_workers=num_workers,
                                   pin_memory=torch.device(device).type == 'cuda',
                                   collate_fn=getattr(dataset, 'collate_fn', None),  # Useful if streaming dynamic lens
-                                  worker_init_fn=worker_init_fn)
-
-        self.num_sampled_batches = 0
+                                  worker_init_fn=worker_init_fn)  # TODO Support using Replay in Env (and by default)
 
         self._batches = iter(self.batches)
 
-        # TODO Dataset auto-standardized to Args already - can delete
-
-        # Check shape of x
-        obs_shape = None
-        if isinstance(dataset[0], (tuple, list, torch.Tensor, np.ndarray)):
-            obs_shape = tuple(dataset[0].shape if isinstance(dataset[0], (torch.Tensor, np.ndarray))
-                              else dataset[0][0].shape)
-        elif isinstance(dataset[0], (dict, Args)) and 'obs' in dataset[0]:
-            obs_shape = tuple(dataset[0]['obs'].shape)
-        if obs_shape is not None:
-            obs_shape = (1,) * (2 - len(obs_shape)) + obs_shape  # At least 1 channel dim and spatial dim - not needed?
-
-        self.discrete = hasattr(dataset, 'classes')
-
-        # Check shape of y
-        action_shape = None
-        if isinstance(dataset[0], (tuple, list)) and len(dataset[0]) == 2:
-            action_shape = (1,) if self.discrete or not hasattr(dataset[0][1], 'shape') else tuple(dataset[0][1].shape)
-        elif isinstance(dataset[0], (dict, Args)) and 'label' in dataset[0]:
-            action_shape = (1,) if self.discrete or not hasattr(dataset[0]['label'], 'shape') \
-                else tuple(dataset[0]['label'].shape)
-
-        self.action_spec = Args({'shape': action_shape,
-                                 'discrete_bins': len(dataset.classes) if self.discrete else None,
-                                 'low': 0 if self.discrete else None,
-                                 'high': len(dataset.classes) - 1 if self.discrete else None,
-                                 'discrete': self.discrete})
-
-        self.obs_spec = Args({'shape': obs_shape,
-                              'low': low,
-                              'high': high})
-
-        # Fill in necessary obs_spec and action_spec stats from dataset  TODO Only when norm or standardize
-        if train and (offline or generate) and (standardize or norm):
-            self.obs_spec.update(compute_stats(self.batches))
-
-        # TODO Alt, load_dataset can output Args of recollected stats as well; maybe specify what to save in card replay
+        self.num_sampled_batches = 0
 
         # Experience
         self.exp = None
 
-    def step(self, action=None):
-        if self.num_sampled_batches > 1:  # To account for reset()
-            self.reset()  # Re-sample
+        # Fill in necessary obs_spec and action_spec stats (e.g. mean, stddev, low, high) from dataset
+        if (not train and stream) and (standardize or norm):
+            # TODO load_dataset can recall stats from card as well; maybe allow specifying what stats to compute
+            self.obs_spec = compute_stats(self.batches)  # TODO Should provide per-Datum specs
 
+        if discrete:
+            self.action_spec = {'discrete_bins': len(dataset.classes)}
+
+    def step(self, action):
+        if self.num_sampled_batches < len(self.batches):  # Episode is "done" at end of epoch
+            return self.reset()  # Re-sample datums
+
+    def reset(self):
+        # Sample batch
+        batch = self.sample()
+        self.exp = Args(done=False, **batch)
         self.num_sampled_batches += 1
 
-        if action is not None:  # No action - "no-op" - allowed for Offline streaming
-            # Adapt to discrete!    Note: storing argmax
-            self.exp.action = self.adapt_to_discrete(action) if self.discrete \
-                else np.reshape(action, self.exp.label.shape) if 'label' in self.exp \
-                else action
+        # Convert sample to numpy  TODO Maybe not necessary
+        for key, value in self.exp.items():
+            self.exp[key] = value.cpu().numpy() if isinstance(value, torch.Tensor) else np.array(value)
 
-        return self.exp
+        # Label should have shape (batch_size, 1) if its shape is (batch_size,)
+        if 'label' in self.exp and len(self.exp.label.shape) == 1:
+            self.exp.label = np.expand_dims(self.exp.label, 1)
 
-    def reset(self):  # The reset step is never stored
-        batch = self.sample()
-
-        # TODO I've standardized it to Args so this whole IF branch can be deleted
-        if isinstance(batch, (tuple, list, torch.Tensor, np.ndarray)):
-            if isinstance(batch, (torch.Tensor, np.ndarray)):
-                batch = [batch]
-
-            assert len(batch) <= 2, 'Use named dictionary pairs if Dataset outputs more than two Datums. ' \
-                                    'Otherwise, will assume "obs", "label".'
-
-            # TODO Is it fine I don't convert to float32?
-            obs, *label = [b.numpy() if isinstance(b, torch.Tensor) else np.array(b) for b in batch]  # Sample
-
-            batch_size = obs.shape[0]
-
-            obs.shape = (batch_size, *self.obs_spec['shape'])
-
-            # Create experience
-            self.exp = Args(obs=obs, done=self.num_sampled_batches == len(self))
-
-            if label:
-                self.exp.label = label[0]
-
-                if len(self.exp.label.shape) == 1:
-                    self.exp.label = np.expand_dims(self.exp.label, 1)
-        else:
-            # TODO Should provide per-Datum specs
-            self.exp = Args(**batch, done=self.num_sampled_batches == len(self))
-
-            for key, value in self.exp.items():
-                self.exp[key] = value.cpu().numpy() if isinstance(value, torch.Tensor) else np.array(value)
-
-            if 'obs' in self.exp:
-                self.exp.obs.shape = (self.exp.obs.shape[0], *self.obs_spec['shape'])
-            if 'label' in self.exp:
-                if len(self.exp.label.shape) == 1:
-                    self.exp.label = np.expand_dims(self.exp.label, 1)
-
+        # Return batch
         return self.exp
 
     def sample(self):
         try:
             return next(self._batches)
         except StopIteration:
-            self.num_sampled_batches = 1
+            self.num_sampled_batches = 0
             self._batches = iter(self.batches)
             return next(self._batches)
 
     def render(self):
         # Assumes image dataset
-        image = self.sample()[0] if self.exp is None else self.exp.obs
+        image = next(iter(self.sample().values())) if self.exp is None else self.exp.obs
         return np.array(image[random.randint(0, len(image) - 1)]).transpose(1, 2, 0)  # Channels-last
 
-    # Arg-maxes if categorical distribution passed in  TODO Is this method needed besides rounding? Maybe move to env
-    def adapt_to_discrete(self, action):
-        shape = self.action_spec['shape']
 
-        try:
-            action = action.reshape(len(action), *shape)  # Assumes a batch dim
-        except (ValueError, RuntimeError):
-            try:
-                action = action.reshape(len(action), -1, *shape)  # Assumes a batch dim
-            except:
-                raise RuntimeError(f'Discrete environment could not broadcast or adapt action of shape {action.shape} '
-                                   f'to expected batch-action shape {(-1, *shape)}')
-            action = action.argmax(1)
-
-        discrete_bins, low, high = self.action_spec['discrete_bins'], self.action_spec['low'], self.action_spec['high']
-
-        # Round to nearest decimal/int corresponding to discrete bins, high, and low  TODO Generalize to regression
-        return np.round((action - low) / (high - low) * (discrete_bins - 1)) / (discrete_bins - 1) * (high - low) + low
-
-    def __len__(self):
-        return len(self.batches)
-
-
-# Mean of empty reward should be NaN, catch acceptable usage warning  TODO delete
+# Mean of empty reward should be NaN, catch acceptable usage warning  TODO Delete if these warnings don't pop up anyway
 warnings.filterwarnings("ignore", message='.*invalid value encountered in scalar divide')
 warnings.filterwarnings("ignore", message='invalid value encountered in double_scalars')
 warnings.filterwarnings("ignore", message='Mean of empty slice')

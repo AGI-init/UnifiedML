@@ -11,9 +11,12 @@ from Agents.Blocks.Architectures.Vision.CNN import cnn_broadcast
 
 """
 Usage example: 
-python Run.py task=classify/mnist generate=true Discriminator=DCGAN.Discriminator Generator=DCGAN.Generator
+ML task=generate discriminator=DCGAN.Discriminator generator=DCGAN.Generator
 
-Note: Dimensionality adaptivity to input shapes is still highly experimental for GANs/DCGAN.
+    Note: Pytorch hasn't yet adapted AdaptiveAvgPool2d to fully support MPS devices. You may have to try device=cpu.
+    - https://forums.fast.ai/t/help-with-m1-error-adaptive-pool-mps-input-sizes-must-be-divisible-by-output-sizes/105784
+
+    Dimensionality adaptivity to input shapes is a new feature for GANs/DCGAN.
 """
 
 
@@ -23,7 +26,7 @@ class Generator(nn.Module):
 
         self.input_shape, self.output_shape = Utils.to_tuple(input_shape), Utils.to_tuple(output_shape)
         # Proprioceptive is channel dim
-        self.input_shape = tuple(self.input_shape) + (1,) * (3 - len(self.input_shape))  # Broadcast input to 2D
+        self.input_shape = tuple(self.input_shape) + (1,) * (3 - len(self.input_shape))  # Broadcast 1D input to 2D
 
         in_channels = self.input_shape[0]
         out_channels = in_channels if self.output_shape is None else self.output_shape[0]

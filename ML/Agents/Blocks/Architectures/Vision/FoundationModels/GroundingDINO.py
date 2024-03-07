@@ -103,7 +103,7 @@ class GroundingDINO(nn.Module):
 # Example Usage:
 # python Run.py env=YouTube env.url='https://youtube.com/live/...=share'
 #                           env.transform=Sequential
-#                           env.transform._targets_='["transforms.Resize(32)","World.Environments.YouTube.AutoLabel"]'
+#                           env.transform._targets_='["transforms.Resize(32)","Agents.Blocks.Architectures.Vision.FoundationModels.GroundingDINO.AutoLabel"]'
 
 class AutoLabel(nn.Module):
     """

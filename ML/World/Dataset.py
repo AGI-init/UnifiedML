@@ -217,6 +217,14 @@ def get_dataset_path(dataset_config, path):
         if 'capacities' in card and 'capacities' not in dataset_config:
             card.pop('capacities')
 
+        for key in card:
+            if isinstance(card[key], (dict, Args)) and 'device' in card[key]:
+                card[key].pop('device', None)
+
+        for key in dataset_config:
+            if isinstance(dataset_config[key], (dict, Args)) and 'device' in dataset_config[key]:
+                dataset_config[key].pop('device', None)
+
         # Just a shorthand
         if 'Transform' in card:
             card.pop('Transform')

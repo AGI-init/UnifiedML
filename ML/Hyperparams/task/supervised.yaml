@@ -20,9 +20,9 @@ nstep: 0
 evaluate_per_steps: 1000
 evaluate_episodes: 1
 learn_per_steps: 1
-learn_steps_after: 0
 seed_steps: 0
 rand_steps: 0
-log_per_episodes: 300
+log_per_epochs: 0
+log_per_steps: 300
 RL: false
 online: false  # Same as offline: true
