@@ -136,19 +136,20 @@ def load_dataset(path, dataset_config, allow_memory=True, train=True, **kwargs):
 
     assert dataset, f'Could not instantiate Dataset.{f" Last error: {str(e)}" if e else ""}'
 
-    if isinstance(dataset[0], (torch.Tensor, np.ndarray)) \
+    if isinstance(dataset[0], (torch.Tensor, np.ndarray)) or len(dataset[0]) == 1 \
             or isinstance(dataset[0], (dict, Args)) and 'label' not in dataset[0]:
-        classify = False
+        classify = False  # TODO Might be presumptive "if 'label' not in dataset[0]"
 
     if classify:
         if hasattr(dataset, 'num_classes'):
+            label = dataset[0]['label'] if isinstance(dataset[0], (dict, Args)) else dataset[0][1]
             error = f'The .num_classes= attribute of Dataset got value {dataset.num_classes} with type ' \
-                    f'{type(dataset[0][1])} labels. If your labels aren\'t consecutive integers starting from 0, ' \
+                    f'{type(label)} labels. If your labels aren\'t consecutive integers starting from 0, ' \
                     f'specify a list instead, e.g., .classes=["dog", "cat"].'
-            assert isinstance(dataset[0][1], int) or \
-                   (isinstance(dataset[0][1], (torch.Tensor, np.ndarray)) or 'numpy.' in str(type(dataset[0][1]))) and \
-                   math.prod(dataset[0][1].shape) < 2 \
-                   and not torch.is_floating_point(torch.as_tensor(dataset[0][1])), error
+            assert isinstance(label, int) or \
+                   (isinstance(label, (torch.Tensor, np.ndarray)) or 'numpy.' in str(type(label))) and \
+                   math.prod(label.shape) < 2 \
+                   and not torch.is_floating_point(torch.as_tensor(label)), error
 
         classes = subset if subset is not None \
             else range(dataset.classes if isinstance(dataset.classes, int)
@@ -325,11 +326,11 @@ class ClassToIdx(Dataset):
         else:
             x = datums
         out = x
-        if y != ():
+        if y is not ():
             y = self.__map[str(y)]
             out = (x, y)
         elif isinstance(out, (dict, Args)) and 'label' in out:
-            out.label = self.__map[str(y)]
+            out.label = self.__map[str(out.label)]
         return out   # Map
 
     def __len__(self):
@@ -384,7 +385,7 @@ class Transform(Dataset):
                     x[key] = F.to_tensor(value)
 
         out = x
-        if y != ():
+        if y is not ():
             out = Args(obs=x, label=y)
         elif not isinstance(out, (Args, dict)):
             out = Args(obs=x)

@@ -4,5 +4,3 @@ suite_name: classify
 
 metric:
   accuracy: World.Metrics.Accuracy
-
-Dataset: MNIST  # Default
